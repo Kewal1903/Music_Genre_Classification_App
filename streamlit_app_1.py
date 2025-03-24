@@ -12,6 +12,100 @@ from joblib import load
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import StandardScaler
+import requests
+import base64
+import json
+from urllib.parse import urlencode
+
+# Spotify API Integration
+class SpotifyAPI:
+    def __init__(self, client_id, client_secret):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.token = None
+        self.token_expiry = 0
+
+    def get_token(self):
+        """Get Spotify API token"""
+        if self.token and time.time() < self.token_expiry:
+            return self.token
+
+        auth_string = f"{self.client_id}:{self.client_secret}"
+        auth_bytes = auth_string.encode('utf-8')
+        auth_base64 = base64.b64encode(auth_bytes).decode('utf-8')
+
+        url = "https://accounts.spotify.com/api/token"
+        headers = {
+            "Authorization": f"Basic {auth_base64}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {"grant_type": "client_credentials"}
+
+        try:
+            response = requests.post(url, headers=headers, data=data)
+            response.raise_for_status()
+            json_result = response.json()
+            self.token = json_result["access_token"]
+            self.token_expiry = time.time() + json_result["expires_in"] - 60  # 60 sec buffer
+            return self.token
+        except Exception as e:
+            st.error(f"Error getting Spotify token: {e}")
+            return None
+
+    def search_by_genre(self, genre, limit=5):
+        """Search for tracks based on genre"""
+        token = self.get_token()
+        if not token:
+            return []
+
+        genre_map = {
+            "blues": "blues",
+            "classical": "classical",
+            "country": "country",
+            "disco": "disco",
+            "hiphop": "hip-hop",
+            "jazz": "jazz",
+            "metal": "metal",
+            "pop": "pop",
+            "reggae": "reggae",
+            "rock": "rock"
+        }
+
+        search_genre = genre_map.get(genre.lower(), genre.lower())
+
+        url = "https://api.spotify.com/v1/search"
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        params = {
+            "q": f"genre:{search_genre}",
+            "type": "track",
+            "limit": limit
+        }
+
+        try:
+            response = requests.get(f"{url}?{urlencode(params)}", headers=headers)
+            response.raise_for_status()
+            tracks = response.json().get("tracks", {}).get("items", [])
+
+            recommendations = []
+            for track in tracks:
+                artists = ", ".join([artist["name"] for artist in track.get("artists", [])])
+                recommendations.append({
+                    "name": track["name"],
+                    "artist": artists,
+                    "album": track.get("album", {}).get("name", ""),
+                    "image_url": track.get("album", {}).get("images", [{}])[0].get("url") if track.get("album", {}).get("images") else None,
+                    "preview_url": track.get("preview_url"),
+                    "external_url": track.get("external_urls", {}).get("spotify")
+                })
+
+            return recommendations
+        except Exception as e:
+            st.error(f"Error searching Spotify: {e}")
+            return []
+
 
 # Page configuration
 st.set_page_config(
@@ -449,102 +543,65 @@ def analyze_audio(file_path, models):
 def display_results(results):
     if not results:
         return
-    
-    # Display the main prediction
+
     genre = results["genre"]
     confidence = results["confidence"]
-    
-    # Get genre characteristics
     characteristics = get_genre_characteristics(genre)
-    
+
     st.markdown(f"""
     <div class="genre-prediction" style="background-color: {characteristics['color']};">
         {genre.upper()} ({confidence:.1f}%)
     </div>
     """, unsafe_allow_html=True)
-    
-    # Create two columns for visualization and details
+
     col1, col2 = st.columns([2, 1])
-    
-    # Column 1: Visualizations in tabs
+
     with col1:
         viz_tabs = st.tabs(["Waveform", "Mel Spectrogram", "Chromagram"])
-        
         with viz_tabs[0]:
             st.image(results["visualizations"]["waveform"])
-            st.caption("Waveform visualization shows the amplitude of the audio signal over time.")
-            
         with viz_tabs[1]:
             st.image(results["visualizations"]["mel_spectrogram"])
-            st.caption("Mel Spectrogram shows the frequency content of the audio over time on a mel scale.")
-            
         with viz_tabs[2]:
             st.image(results["visualizations"]["chromagram"])
-            st.caption("Chromagram shows the distribution of energy across the 12 pitch classes.")
-    
-    # Column 2: Genre details and characteristics
+
     with col2:
         st.markdown(f"### {genre.title()} Characteristics")
         st.markdown(f"**Description**: {characteristics['description']}")
         st.markdown(f"**Instruments**: {characteristics['instruments']}")
         st.markdown(f"**Origin**: {characteristics['origin']}")
         st.markdown(f"**Typical Tempo**: {characteristics['tempo']}")
-        
-        # Display audio stats
         st.markdown("### Audio Statistics")
         st.markdown(f"**Duration**: {results['audio_length']:.2f} seconds")
         st.markdown(f"**Sample Rate**: {results['sample_rate']} Hz")
-    
-    # Display prediction confidence for top genres
+
     st.markdown("### Confidence Levels")
-    
-    # Create a bar chart for genre confidence
     fig = px.bar(
-        x=results["top_probs"],
-        y=results["top_genres"],
-        orientation='h',
+        x=results["top_probs"], y=results["top_genres"], orientation='h',
         labels={"x": "Confidence (%)", "y": "Genre"},
         text=[f"{p:.1f}%" for p in results["top_probs"]],
         color=results["top_probs"],
         color_continuous_scale=["blue", "green", "#1DB954"],
         title="Top Genre Predictions"
     )
-    
-    fig.update_layout(
-        xaxis_range=[0, 100],
-        showlegend=False,
-        height=300,
-        margin=dict(l=0, r=0, t=40, b=0)
-    )
-    
+    fig.update_layout(xaxis_range=[0, 100], showlegend=False, height=300)
     st.plotly_chart(fig, use_container_width=True)
-    
-    # Display individual model predictions if available
-    if results["model_predictions"]:
-        st.markdown("### Individual Model Predictions")
-        model_df = pd.DataFrame({
-            "Model": list(results["model_predictions"].keys()),
-            "Predicted Genre": list(results["model_predictions"].values())
-        })
-        st.dataframe(model_df, use_container_width=True)
-    
-    # Similar artists/songs recommendation (placeholder)
-    with st.expander("Similar Artists & Songs"):
-        st.info("This is a placeholder for similar artists and songs recommendations. In a full implementation, this would connect to a music database or API.")
-        st.markdown(f"Artists typically associated with {genre} include:")
-        
-        # Mock data for demonstration
-        if genre.lower() == "rock":
-            artists = ["Led Zeppelin", "Queen", "AC/DC", "The Rolling Stones", "Nirvana"]
-        elif genre.lower() == "jazz":
-            artists = ["Miles Davis", "John Coltrane", "Ella Fitzgerald", "Louis Armstrong", "Thelonious Monk"]
-        elif genre.lower() == "hiphop":
-            artists = ["Kendrick Lamar", "Jay-Z", "Tupac Shakur", "Nas", "The Notorious B.I.G."]
-        else:
-            artists = ["Artist 1", "Artist 2", "Artist 3", "Artist 4", "Artist 5"]
-            
-        for artist in artists:
-            st.markdown(f"- {artist}")
+
+    st.markdown("### Spotify Recommendations")
+    spotify_api = SpotifyAPI(st.secrets["spotify"]["client_id"], 
+                         st.secrets["spotify"]["client_secret"])
+    recommended_tracks = spotify_api.search_by_genre(genre)
+
+    if recommended_tracks:
+        for track in recommended_tracks:
+            with st.container():
+                st.markdown(f"**[{track['name']}]({track['external_url']})** - {track['artist']}")
+                if track["image_url"]:
+                    st.image(track["image_url"], width=100)
+                if track["preview_url"]:
+                    st.audio(track["preview_url"], format="audio/mp3")
+    else:
+        st.warning("No recommendations found for this genre.")
 
 def main():
     # Configure page
