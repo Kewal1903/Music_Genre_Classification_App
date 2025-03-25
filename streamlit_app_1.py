@@ -489,8 +489,9 @@ def prediction_section(models):
     # Create tabs for different input methods
     tabs = st.tabs(["Upload File", "Record Microphone", "Sample Library"])
     
-    audio_data = None
-    file_path = None
+    # Initialize session state for file path if not exists
+    if 'audio_file_path' not in st.session_state:
+        st.session_state.audio_file_path = None
     
     # Upload tab
     with tabs[0]:
@@ -502,7 +503,7 @@ def prediction_section(models):
                 f.write(uploaded_file.getvalue())
             
             st.audio(uploaded_file, format=f"audio/{uploaded_file.name.split('.')[-1]}")
-            file_path = temp_audio_path
+            st.session_state.audio_file_path = temp_audio_path
     
     # Recording tab
     with tabs[1]:
@@ -530,7 +531,7 @@ def prediction_section(models):
                     
                     st.success("Recording complete!")
                     st.audio(temp_audio_path, format="audio/wav")
-                    file_path = temp_audio_path
+                    st.session_state.audio_file_path = temp_audio_path
                     
                 except Exception as e:
                     st.error(f"Error recording audio: {e}")
@@ -552,13 +553,13 @@ def prediction_section(models):
                     selected_sample = st.selectbox("Select a sample", samples)
                     sample_path = os.path.join(sample_dir, selected_sample)
                     st.audio(sample_path)
-                    file_path = sample_path
+                    st.session_state.audio_file_path = sample_path
                 else:
                     st.warning("No audio samples found in the sample directory. Please add some audio files to the 'sample_audio' folder.")
             except Exception as e:
                 st.error(f"Error accessing sample directory: {e}")
     
-    return file_path
+    return st.session_state.audio_file_path
 
 def analyze_audio(file_path, models):
     if not file_path:
@@ -705,19 +706,12 @@ def main():
     file_path = prediction_section(models)
     
     # Analyze button
-    if file_path and st.button("🔍 Analyze Genre"):
-        results = analyze_audio(file_path, models)
+    if st.session_state.audio_file_path and st.button("🔍 Analyze Genre"):
+        # Reuse the stored file path from session state
+        results = analyze_audio(st.session_state.audio_file_path, models)
         
         if results:
             display_results(results)
-            
-            # Clean up temporary files
-            for viz_file in results["visualizations"].values():
-                try:
-                    if os.path.exists(viz_file):
-                        os.unlink(viz_file)
-                except Exception:
-                    pass
     
     # Footer
     st.markdown("---")
@@ -730,6 +724,5 @@ def main():
         """,
         unsafe_allow_html=True
     )
-
 if __name__ == "__main__":
     main()
