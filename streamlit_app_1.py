@@ -1,4 +1,6 @@
 import streamlit as st
+import sounddevice as sd
+import wavio
 import numpy as np
 import pandas as pd
 import librosa
@@ -17,7 +19,6 @@ import base64
 import json
 from urllib.parse import urlencode
 
-# Spotify API Integration
 class SpotifyAPI:
     def __init__(self, client_id, client_secret):
         self.client_id = client_id
@@ -106,7 +107,6 @@ class SpotifyAPI:
             st.error(f"Error searching Spotify: {e}")
             return []
 
-
 # Page configuration
 st.set_page_config(
     page_title="Music Genre Classifier",
@@ -115,41 +115,128 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better UI
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1DB954;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .sub-header {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #191414;
-        margin-bottom: 0.5rem;
-    }
-    .info-text {
-        font-size: 1rem;
-        color: #555555;
-    }
-    .genre-prediction {
-        font-size: 2rem;
-        font-weight: 700;
-        text-align: center;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-        background-color: #1DB954;
-        color: white;
-    }
-    .stProgress > div > div > div > div {
-        background-color: #1DB954;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Custom CSS for better UI with light and dark mode
+def get_custom_css(theme='light'):
+    if theme == 'light':
+        bg_primary = 'indigo'
+        bg_secondary = 'aqua'
+        text_primary = 'white'
+        text_secondary = 'white'
+        accent_color = 'purple'
+        accent_hover = 'grey'
+        card_shadow = 'rgba(0, 0, 0, 0.1)'
+    else:  # dark mode
+        bg_primary = 'black'
+        bg_secondary = 'olive'
+        text_primary = 'white'
+        text_secondary = 'white'
+        accent_color = 'yellow'
+        accent_hover = 'grey'
+        card_shadow = 'rgba(255, 255, 255, 0.1)'
+
+    return f"""
+    <style>
+        /* Global Styles */
+        body {{
+            background-color: {bg_primary};
+            color: {text_primary};
+            transition: all 0.3s ease;
+        }}
+
+        /* Streamlit Specific Overrides */
+        .stApp {{
+            background: linear-gradient(135deg, {bg_primary} 0%, {bg_secondary} 100%);
+        }}
+
+        /* Main Header */
+        .main-header {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: {accent_color};
+            text-align: center;
+            margin-bottom: 1rem;
+            text-shadow: 1px 1px 2px {card_shadow};
+        }}
+
+        /* Sub Header */
+        .sub-header {{
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: {text_primary};
+            margin-bottom: 0.5rem;
+        }}
+
+        /* Information Text */
+        .info-text {{
+            font-size: 1rem;
+            color: {text_secondary};
+        }}
+
+        /* Genre Prediction */
+        .genre-prediction {{
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            background: linear-gradient(45deg, {accent_color}, {accent_hover});
+            color: white;
+            box-shadow: 0 4px 6px {card_shadow};
+        }}
+
+        /* Progress Bar */
+        .stProgress > div > div > div > div {{
+            background-color: {accent_color};
+        }}
+
+        /* Improved Card Styles */
+        .stCard {{
+            background-color: {bg_secondary};
+            border-radius: 12px;
+            box-shadow: 0 4px 6px {card_shadow};
+            transition: transform 0.3s ease;
+        }}
+
+        .stCard:hover {{
+            transform: scale(1.02);
+        }}
+
+        /* Improved Sidebar */
+        .css-1aumxhk {{
+            background: linear-gradient(135deg, {bg_secondary} 0%, {bg_primary} 100%);
+        }}
+
+        /* Text Color in Sidebar and Main Area */
+        .stMarkdown, .stText {{
+            color: {text_primary};
+        }}
+
+        /* Button Styles */
+        .stButton > button {{
+            background-color: {accent_color};
+            color: white;
+            transition: all 0.3s ease;
+        }}
+
+        .stButton > button:hover {{
+            background-color: {accent_hover};
+        }}
+    </style>
+    """
+
+# Theme toggle function
+def theme_toggle():
+    # Check if theme is already in session state
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'light'
+    
+    # Toggle button
+    if st.sidebar.button('🌓 Toggle Theme'):
+        st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
+    
+    # Apply CSS based on current theme
+    st.markdown(get_custom_css(st.session_state.theme), unsafe_allow_html=True)
 
 def extract_features(y, sr):
     # Basic features
@@ -419,14 +506,14 @@ def prediction_section(models):
     
     # Recording tab
     with tabs[1]:
-        if st.button("🎤 Start Recording (5 seconds)"):
+        if st.button("🎤 Start Recording (30 seconds)"):
             with st.spinner("Recording..."):
                 try:
                     import sounddevice as sd
                     import wavio
                     
                     fs = 22050  # Sample rate
-                    duration = 5  # seconds
+                    duration = 30  # seconds
                     recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='float32')
                     
                     # Add a progress bar
@@ -604,6 +691,9 @@ def display_results(results):
         st.warning("No recommendations found for this genre.")
 
 def main():
+    # Theme toggle in sidebar
+    theme_toggle()
+    
     # Configure page
     header_section()
     sidebar_section()
