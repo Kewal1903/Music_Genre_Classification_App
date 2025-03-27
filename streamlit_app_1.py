@@ -1,3 +1,4 @@
+
 import streamlit as st
 import sounddevice as sd
 import wavio
@@ -118,8 +119,8 @@ st.set_page_config(
 # Custom CSS for better UI with light and dark mode
 def get_custom_css(theme='light'):
     if theme == 'light':
-        bg_primary = 'indigo'
-        bg_secondary = 'aqua'
+        bg_primary = '#fbda61'
+        bg_secondary = '#ff5acd'
         text_primary = 'white'
         text_secondary = 'white'
         accent_color = 'purple'
@@ -232,7 +233,7 @@ def theme_toggle():
         st.session_state.theme = 'light'
     
     # Toggle button
-    if st.sidebar.button('🌓 Toggle Theme'):
+    if st.sidebar.button('🌓 Toggle Theme', key = 'toggle_theme_button'):
         st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
     
     # Apply CSS based on current theme
@@ -276,14 +277,17 @@ def generate_visualizations(y, sr):
     # Create visualizations
     visualizations = {}
     
-    # Waveform
-    plt.figure(figsize=(10, 4))
-    librosa.display.waveshow(y, sr=sr)
-    plt.title('Waveform')
+    # Waveform with grid and different color
+    plt.figure(figsize=(10, 4), facecolor='white')
+    plt.plot(np.linspace(0, len(y)/sr, len(y)), y, color='#3F51B5')  # Changed color
+    plt.title('Waveform', fontsize=12)
+    plt.xlabel('Time (seconds)', fontsize=10)
+    plt.ylabel('Amplitude', fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.7)  # Added grid
     plt.tight_layout()
     
     waveform = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(waveform.name)
+    plt.savefig(waveform.name, facecolor='white', edgecolor='none')
     plt.close()
     visualizations['waveform'] = waveform.name
     
@@ -428,21 +432,127 @@ def get_genre_characteristics(genre):
     
     return characteristics[genre.lower()]
 
-# Define app sections
 def header_section():
-    st.markdown('<div class="main-header">🎵 Music Genre Classification</div>', unsafe_allow_html=True)
+    import streamlit as st
+import streamlit.components.v1 as components
+
+# Layout and Styling
+st.markdown("""
+    <style>
+        .main-header {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            color: var(--text_primary);
+        }
+        .custom-container {
+            background-color: var(--bg_primary);
+            padding: 20px;
+            border-radius: 12px;
+            color: var(--text_primary);
+        }
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0 10px;
+        }
+        .custom-table th, .custom-table td {
+            padding: 12px;
+            text-align: left;
+        }
+        .custom-table tr {
+            background-color: var(--bg_secondary);
+            border-radius: 8px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# **Main Heading**
+st.markdown('<div class="main-header">🎵 Music Genre Classification</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.markdown("## About")
     st.markdown(
         """
-        <div class="info-text">
-        Upload an audio file or record a sample to identify its musical genre. 
-        The app analyzes audio characteristics to determine the most likely genre.
+        <div class="custom-container">
+            <h4>🤖 Machine Learning Models</h4>
+            <table class="custom-table">
+                <tr>
+                    <th>Model</th>
+                    <th>Description</th>
+                </tr>
+                <tr><td><strong>🧠 SVM</strong></td><td>Support Vector Machine for non-linear classification</td></tr>
+                <tr><td><strong>🌳 Random Forest</strong></td><td>Ensemble method with multiple decision trees</td></tr>
+                <tr><td><strong>🚀 XGBoost</strong></td><td>Gradient boosting with high performance</td></tr>
+                <tr><td><strong>🧮 Perceptron</strong></td><td>Neural network-based linear classifier</td></tr>
+            </table>
         </div>
-        """, 
+        """,
         unsafe_allow_html=True
     )
-    
-    # Add a cool horizontal line
-    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # **Fixed Genres Section Using components.html**
+    components.html(
+        """
+        <style>
+            .genre-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 10px;
+            }
+            .genre-box {
+                padding: 8px 14px;
+                background-color: var(--bg_primary);
+                color: white;
+                font-weight: bold;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+        </style>
+        <h2>🎵 Supported Genres</h2>
+        <div class="genre-container">
+            <div class="genre-box">Blues</div>
+            <div class="genre-box">Classical</div>
+            <div class="genre-box">Country</div>
+            <div class="genre-box">Disco</div>
+            <div class="genre-box">Hip Hop</div>
+            <div class="genre-box">Jazz</div>
+            <div class="genre-box">Metal</div>
+            <div class="genre-box">Pop</div>
+            <div class="genre-box">Reggae</div>
+            <div class="genre-box">Rock</div>
+        </div>
+        """,
+        height=200
+    )
+
+with col2:
+    st.markdown("## Help")
+    st.info(
+        """
+        **Tips for best results:**
+        - Use clear audio samples without background noise
+        - Ensure the sample contains distinguishable musical elements
+        - Longer samples (10+ seconds) provide better results
+        - Try different segments of a song for more accurate classification
+        
+        **Settings:**
+        - Sample Duration: 5-30 seconds
+        - Recommended: 10-15 seconds
+        """
+    )
+
+# Horizontal Line
+st.markdown("<hr style='border-color: var(--accent_color);'>", unsafe_allow_html=True)
+
+
+
+
+
 
 def sidebar_section():
     with st.sidebar:
@@ -469,8 +579,8 @@ def sidebar_section():
         )
         
         st.markdown("## Settings")
-        sample_duration = st.slider("Sample Duration (seconds)", 5, 30, 10)
-        confidence_threshold = st.slider("Confidence Threshold (%)", 0, 100, 20)
+        sample_duration = st.slider("Sample Duration (seconds)", 5, 30, 10, key = 'slider_1')
+        confidence_threshold = st.slider("Confidence Threshold (%)", 0, 100, 20, key = 'slider_2')
         
         st.markdown("## Help")
         with st.expander("Tips for best results"):
@@ -504,6 +614,10 @@ def prediction_section(models):
             
             st.audio(uploaded_file, format=f"audio/{uploaded_file.name.split('.')[-1]}")
             st.session_state.audio_file_path = temp_audio_path
+            
+            # Add Analyze Genre button for uploaded files
+            if st.button("🔍 Analyze Genre", key="upload_analyze"):
+                return temp_audio_path
     
     # Recording tab
     with tabs[1]:
@@ -533,6 +647,10 @@ def prediction_section(models):
                     st.audio(temp_audio_path, format="audio/wav")
                     st.session_state.audio_file_path = temp_audio_path
                     
+                    # Add Analyze Genre button for recorded files
+                    if st.button("🔍 Analyze Genre", key="record_analyze"):
+                        return temp_audio_path
+                    
                 except Exception as e:
                     st.error(f"Error recording audio: {e}")
                     st.warning("Microphone recording may not be supported in your browser. Please try uploading a file instead.")
@@ -550,10 +668,17 @@ def prediction_section(models):
             try:
                 samples = [f for f in os.listdir(sample_dir) if f.endswith(('.wav', '.mp3', '.ogg'))]
                 if samples:
+                    # Add 'None' as the first option
+                    samples.insert(0, 'None')
                     selected_sample = st.selectbox("Select a sample", samples)
-                    sample_path = os.path.join(sample_dir, selected_sample)
-                    st.audio(sample_path)
-                    st.session_state.audio_file_path = sample_path
+                    
+                    if selected_sample != 'None':
+                        sample_path = os.path.join(sample_dir, selected_sample)
+                        st.audio(sample_path)
+                        st.session_state.audio_file_path = sample_path
+                    else:
+                        # Reset the audio file path if 'None' is selected
+                        st.session_state.audio_file_path = None
                 else:
                     st.warning("No audio samples found in the sample directory. Please add some audio files to the 'sample_audio' folder.")
             except Exception as e:
@@ -637,8 +762,8 @@ def display_results(results):
     characteristics = get_genre_characteristics(genre)
 
     st.markdown(f"""
-    <div class="genre-prediction" style="background-color: {characteristics['color']};">
-        {genre.upper()} ({confidence:.1f}%)
+    <div style="background-color: {characteristics['color']}; color: white; text-align: center; padding: 10px; border-radius: 10px;">
+        <h2>{genre.upper()} ({confidence:.1f}%)</h2>
     </div>
     """, unsafe_allow_html=True)
 
@@ -664,40 +789,50 @@ def display_results(results):
         st.markdown(f"**Sample Rate**: {results['sample_rate']} Hz")
 
     st.markdown("### Confidence Levels")
-    fig = px.bar(
-        x=results["top_probs"], y=results["top_genres"], orientation='h',
-        labels={"x": "Confidence (%)", "y": "Genre"},
-        text=[f"{p:.1f}%" for p in results["top_probs"]],
-        color=results["top_probs"],
-        color_continuous_scale=["blue", "green", "#1DB954"],
-        title="Top Genre Predictions"
+    # Pie chart modifications
+    fig = go.Figure(data=[go.Pie(
+        labels=results["top_genres"], 
+        values=results["top_probs"], 
+        hole=.5,  # Increased inner radius
+        textinfo='label+percent',
+        hoverinfo='label+value',
+        marker=dict(colors=px.colors.qualitative.Pastel)  # Softer colors
+    )])
+    fig.update_layout(
+        title="Top Genre Predictions", 
+        plot_bgcolor='white',  # White background
+        width=600  # Half screen width
     )
-    fig.update_layout(xaxis_range=[0, 100], showlegend=False, height=300)
     st.plotly_chart(fig, use_container_width=True)
 
+    # Spotify Recommendations (Keep unchanged)
     st.markdown("### Spotify Recommendations")
     spotify_api = SpotifyAPI(st.secrets["spotify"]["client_id"], 
                          st.secrets["spotify"]["client_secret"])
     recommended_tracks = spotify_api.search_by_genre(genre)
 
     if recommended_tracks:
-        for track in recommended_tracks:
-            with st.container():
-                st.markdown(f"**[{track['name']}]({track['external_url']})** - {track['artist']}")
+        recommendation_cols = st.columns(len(recommended_tracks))
+        for i, track in enumerate(recommended_tracks):
+            with recommendation_cols[i]:
+                st.markdown(f"#### [{track['name']}]({track['external_url']})")
+                st.markdown(f"*{track['artist']}*")
                 if track["image_url"]:
-                    st.image(track["image_url"], width=100)
+                    st.image(track["image_url"], use_container_width=True)
                 if track["preview_url"]:
                     st.audio(track["preview_url"], format="audio/mp3")
     else:
         st.warning("No recommendations found for this genre.")
 
 def main():
-    # Theme toggle in sidebar
+    # Apply custom CSS
+    st.markdown(get_custom_css(), unsafe_allow_html=True)
+    
+    # Theme toggle button
     theme_toggle()
     
-    # Configure page
+    # Header section with About and Help
     header_section()
-    sidebar_section()
     
     # Load models
     models = load_models()
@@ -706,8 +841,7 @@ def main():
     file_path = prediction_section(models)
     
     # Analyze button
-    if st.session_state.audio_file_path and st.button("🔍 Analyze Genre"):
-        # Reuse the stored file path from session state
+    if st.session_state.audio_file_path:
         results = analyze_audio(st.session_state.audio_file_path, models)
         
         if results:
@@ -724,5 +858,6 @@ def main():
         """,
         unsafe_allow_html=True
     )
+
 if __name__ == "__main__":
     main()
