@@ -1,3 +1,4 @@
+
 import streamlit as st
 import sounddevice as sd
 import wavio
@@ -107,7 +108,6 @@ class SpotifyAPI:
             st.error(f"Error searching Spotify: {e}")
             return []
 
-# Page configuration
 st.set_page_config(
     page_title="Music Genre Classifier",
     page_icon="🎵",
@@ -115,7 +115,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better UI with light and dark mode
 def get_custom_css(theme='light'):
     if theme == 'light':
         bg_primary = '#fbda61'
@@ -225,64 +224,51 @@ def get_custom_css(theme='light'):
     </style>
     """
 
-# Theme toggle function
 def theme_toggle():
-    # Check if theme is already in session state
     if 'theme' not in st.session_state:
         st.session_state.theme = 'light'
     
-    # Toggle button
     if st.sidebar.button('🌓 Toggle Theme', key = 'toggle_theme_button'):
         st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
     
-    # Apply CSS based on current theme
     st.markdown(get_custom_css(st.session_state.theme), unsafe_allow_html=True)
 
 def extract_features(y, sr):
-    # Basic features
     mfccs = np.mean(librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T, axis=0)
     mfccs_var = np.var(librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T, axis=0)
     chroma = np.mean(librosa.feature.chroma_stft(y=y, sr=sr).T, axis=0)
     spectral_contrast = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr).T, axis=0)
     tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(y), sr=sr).T, axis=0)
     
-    # Additional features
     zcr = np.mean(librosa.feature.zero_crossing_rate(y).T, axis=0)
     spectral_centroid = np.mean(librosa.feature.spectral_centroid(y=y, sr=sr).T, axis=0)
     spectral_bandwidth = np.mean(librosa.feature.spectral_bandwidth(y=y, sr=sr).T, axis=0)
     spectral_rolloff = np.mean(librosa.feature.spectral_rolloff(y=y, sr=sr).T, axis=0)
     
-    # Rhythm features
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     tempo_feature = np.array([tempo])
     
-    # RMS energy
     rms = np.mean(librosa.feature.rms(y=y).T, axis=0)
     
-    # Mel spectrogram
     mel_spec = np.mean(librosa.feature.melspectrogram(y=y, sr=sr).T, axis=0)
     mel_spec_var = np.var(librosa.feature.melspectrogram(y=y, sr=sr).T, axis=0)
     
-    # Stack all features
     return np.hstack([
         mfccs, mfccs_var, chroma, spectral_contrast, tonnetz, 
         zcr, spectral_centroid, spectral_bandwidth, spectral_rolloff,
-        tempo_feature.reshape(-1),  # Ensure tempo_feature is properly shaped
-        rms, mel_spec[:20], mel_spec_var[:20]  # Limit mel features to prevent too high dimensionality
+        tempo_feature.reshape(-1),  
+        rms, mel_spec[:20], mel_spec_var[:20]  
     ])
 
-# Function to generate audio visualizations
 def generate_visualizations(y, sr):
-    # Create visualizations
     visualizations = {}
     
-    # Waveform with grid and different color
     plt.figure(figsize=(10, 4), facecolor='white')
-    plt.plot(np.linspace(0, len(y)/sr, len(y)), y, color='#3F51B5')  # Changed color
+    plt.plot(np.linspace(0, len(y)/sr, len(y)), y, color='#3F51B5')  
     plt.title('Waveform', fontsize=12)
     plt.xlabel('Time (seconds)', fontsize=10)
     plt.ylabel('Amplitude', fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)  # Added grid
+    plt.grid(True, linestyle='--', alpha=0.7)  
     plt.tight_layout()
     
     waveform = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -290,7 +276,6 @@ def generate_visualizations(y, sr):
     plt.close()
     visualizations['waveform'] = waveform.name
     
-    # Mel Spectrogram
     plt.figure(figsize=(10, 4))
     S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128)
     S_dB = librosa.power_to_db(S, ref=np.max)
@@ -304,7 +289,6 @@ def generate_visualizations(y, sr):
     plt.close()
     visualizations['mel_spectrogram'] = mel_spec.name
     
-    # Chromagram
     plt.figure(figsize=(10, 4))
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     librosa.display.specshow(chroma, sr=sr, x_axis='time', y_axis='chroma')
@@ -319,32 +303,27 @@ def generate_visualizations(y, sr):
     
     return visualizations
 
-# Load models and preprocessing objects
 @st.cache_resource
 def load_models():
     models = {}
     
     try:
-        # Try to load best ensemble model first
         models["best_ensemble"] = load("best_ensemble_genre_classifier.joblib")
         models["scaler"] = load("feature_scaler.joblib")
         models["label_encoder"] = load("label_encoder.joblib")
         
-        # Try to load individual models if available
         model_files = [f for f in os.listdir('.') if f.endswith('_genre_classifier.joblib') and not f.startswith('best')]
         for model_file in model_files:
             model_name = model_file.replace('_genre_classifier.joblib', '').replace('_', ' ').title()
             models[model_name] = load(model_file)
         
     except Exception as e:
-        # Fallback to original model
         st.warning(f"Could not load improved models, using fallback model. Error: {e}")
         models["ensemble"] = load("ensemble_genre_classifier.joblib")
         models["label_encoder"] = load("label_encoder.joblib")
     
     return models
 
-# Get genre characteristics
 def get_genre_characteristics(genre):
     characteristics = {
         "blues": {
@@ -419,7 +398,6 @@ def get_genre_characteristics(genre):
         }
     }
     
-    # Return default characteristics if genre not found
     if genre.lower() not in characteristics:
         return {
             "description": "Information not available for this genre.",
@@ -435,7 +413,6 @@ def header_section():
     import streamlit as st
 import streamlit.components.v1 as components
 
-# Layout and Styling
 st.markdown("""
     <style>
         .main-header {
@@ -467,7 +444,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# **Main Heading**
 st.markdown('<div class="main-header">🎵 Music Genre Classification</div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([2, 1])
@@ -493,7 +469,6 @@ with col1:
         unsafe_allow_html=True
     )
 
-    # **Fixed Genres Section Using components.html**
     components.html(
         """
         <style>
@@ -545,13 +520,7 @@ with col2:
         """
     )
 
-# Horizontal Line
 st.markdown("<hr style='border-color: var(--accent_color);'>", unsafe_allow_html=True)
-
-
-
-
-
 
 def sidebar_section():
     with st.sidebar:
@@ -595,18 +564,14 @@ def sidebar_section():
 def prediction_section(models):
     st.markdown('<div class="sub-header">Upload or Record Audio</div>', unsafe_allow_html=True)
     
-    # Create tabs for different input methods
     tabs = st.tabs(["Upload File", "Record Microphone", "Sample Library"])
     
-    # Initialize session state for file path if not exists
     if 'audio_file_path' not in st.session_state:
         st.session_state.audio_file_path = None
     
-    # Upload tab
     with tabs[0]:
         uploaded_file = st.file_uploader("Choose an audio file", type=["wav", "mp3", "ogg"])
         if uploaded_file:
-            # Save uploaded file to temporary location
             temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}").name
             with open(temp_audio_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
@@ -614,11 +579,9 @@ def prediction_section(models):
             st.audio(uploaded_file, format=f"audio/{uploaded_file.name.split('.')[-1]}")
             st.session_state.audio_file_path = temp_audio_path
             
-            # Add Analyze Genre button for uploaded files
             if st.button("🔍 Analyze Genre", key="upload_analyze"):
                 return temp_audio_path
     
-    # Recording tab
     with tabs[1]:
         if st.button("🎤 Start Recording (30 seconds)"):
             with st.spinner("Recording..."):
@@ -626,11 +589,10 @@ def prediction_section(models):
                     import sounddevice as sd
                     import wavio
                     
-                    fs = 22050  # Sample rate
-                    duration = 30  # seconds
+                    fs = 22050  
+                    duration = 30  
                     recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='float32')
                     
-                    # Add a progress bar
                     progress_bar = st.progress(0)
                     for i in range(100):
                         time.sleep(duration/100)
@@ -638,7 +600,6 @@ def prediction_section(models):
                     
                     sd.wait()
                     
-                    # Save the recording
                     temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
                     wavio.write(temp_audio_path, recording, fs, sampwidth=2)
                     
@@ -646,7 +607,6 @@ def prediction_section(models):
                     st.audio(temp_audio_path, format="audio/wav")
                     st.session_state.audio_file_path = temp_audio_path
                     
-                    # Add Analyze Genre button for recorded files
                     if st.button("🔍 Analyze Genre", key="record_analyze"):
                         return temp_audio_path
                     
@@ -654,12 +614,10 @@ def prediction_section(models):
                     st.error(f"Error recording audio: {e}")
                     st.warning("Microphone recording may not be supported in your browser. Please try uploading a file instead.")
     
-    # Sample library tab
     with tabs[2]:
         st.info("Choose a sample from our library to analyze")
         sample_dir = "sample_audio"
         
-        # Create sample directory if it doesn't exist
         if not os.path.exists(sample_dir):
             os.makedirs(sample_dir)
             st.warning("Sample directory created. Please add some audio samples to the 'sample_audio' folder.")
@@ -667,7 +625,6 @@ def prediction_section(models):
             try:
                 samples = [f for f in os.listdir(sample_dir) if f.endswith(('.wav', '.mp3', '.ogg'))]
                 if samples:
-                    # Add 'None' as the first option
                     samples.insert(0, 'None')
                     selected_sample = st.selectbox("Select a sample", samples)
                     
@@ -676,7 +633,6 @@ def prediction_section(models):
                         st.audio(sample_path)
                         st.session_state.audio_file_path = sample_path
                     else:
-                        # Reset the audio file path if 'None' is selected
                         st.session_state.audio_file_path = None
                 else:
                     st.warning("No audio samples found in the sample directory. Please add some audio files to the 'sample_audio' folder.")
@@ -691,23 +647,17 @@ def analyze_audio(file_path, models):
     
     with st.spinner("Analyzing audio..."):
         try:
-            # Load the audio
             y, sr = librosa.load(file_path, duration=30)
             
-            # Extract features
             features = extract_features(y, sr)
             
-            # Generate visualizations
             visualizations = generate_visualizations(y, sr)
             
-            # Prepare features for model
             features_reshaped = features.reshape(1, -1)
             
-            # Scale features if scaler is available
             if "scaler" in models:
                 features_reshaped = models["scaler"].transform(features_reshaped)
             
-            # Make prediction with best ensemble if available, otherwise use fallback model
             if "best_ensemble" in models:
                 model = models["best_ensemble"]
                 predicted_probs = model.predict_proba(features_reshaped)[0]
@@ -717,16 +667,13 @@ def analyze_audio(file_path, models):
                 predicted_probs = model.predict_proba(features_reshaped)[0]
                 predicted_class = model.predict(features_reshaped)[0]
             
-            # Get genre label
             label_encoder = models["label_encoder"]
             predicted_genre = label_encoder.inverse_transform([predicted_class])[0]
             
-            # Get top 3 predictions
             top_indices = predicted_probs.argsort()[-3:][::-1]
             top_genres = label_encoder.inverse_transform(top_indices)
             top_probs = predicted_probs[top_indices]
             
-            # Get additional predictions from individual models if available
             model_predictions = {}
             for name, model in models.items():
                 if name not in ["best_ensemble", "ensemble", "scaler", "label_encoder"]:
@@ -788,23 +735,21 @@ def display_results(results):
         st.markdown(f"**Sample Rate**: {results['sample_rate']} Hz")
 
     st.markdown("### Confidence Levels")
-    # Pie chart modifications
     fig = go.Figure(data=[go.Pie(
         labels=results["top_genres"], 
         values=results["top_probs"], 
-        hole=.5,  # Increased inner radius
+        hole=.5,  
         textinfo='label+percent',
         hoverinfo='label+value',
-        marker=dict(colors=px.colors.qualitative.Pastel)  # Softer colors
+        marker=dict(colors=px.colors.qualitative.Pastel)  
     )])
     fig.update_layout(
         title="Top Genre Predictions", 
-        plot_bgcolor='white',  # White background
-        width=600  # Half screen width
+        plot_bgcolor='white',  
+        width=600  
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Spotify Recommendations (Keep unchanged)
     st.markdown("### Spotify Recommendations")
     spotify_api = SpotifyAPI(st.secrets["spotify"]["client_id"], 
                          st.secrets["spotify"]["client_secret"])
@@ -824,29 +769,22 @@ def display_results(results):
         st.warning("No recommendations found for this genre.")
 
 def main():
-    # Apply custom CSS
     st.markdown(get_custom_css(), unsafe_allow_html=True)
     
-    # Theme toggle button
     theme_toggle()
     
-    # Header section with About and Help
     header_section()
     
-    # Load models
     models = load_models()
     
-    # Get audio input
     file_path = prediction_section(models)
     
-    # Analyze button
     if st.session_state.audio_file_path:
         results = analyze_audio(st.session_state.audio_file_path, models)
         
         if results:
             display_results(results)
     
-    # Footer
     st.markdown("---")
     st.markdown(
         """
