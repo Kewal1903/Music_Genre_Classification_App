@@ -277,14 +277,17 @@ def generate_visualizations(y, sr):
     # Create visualizations
     visualizations = {}
     
-    # Waveform
-    plt.figure(figsize=(10, 4))
-    librosa.display.waveshow(y, sr=sr)
-    plt.title('Waveform')
+    # Waveform with grid and different color
+    plt.figure(figsize=(10, 4), facecolor='white')
+    plt.plot(np.linspace(0, len(y)/sr, len(y)), y, color='#3F51B5')  # Changed color
+    plt.title('Waveform', fontsize=12)
+    plt.xlabel('Time (seconds)', fontsize=10)
+    plt.ylabel('Amplitude', fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.7)  # Added grid
     plt.tight_layout()
     
     waveform = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(waveform.name)
+    plt.savefig(waveform.name, facecolor='white', edgecolor='none')
     plt.close()
     visualizations['waveform'] = waveform.name
     
@@ -432,15 +435,51 @@ def get_genre_characteristics(genre):
 # Define app sections
 def header_section():
     st.markdown('<div class="main-header">🎵 Music Genre Classification</div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="info-text">
-        Upload an audio file or record a sample to identify its musical genre. 
-        The app analyzes audio characteristics to determine the most likely genre.
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    
+    # Layout for About and Help sections
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("## About")
+        st.info(
+            """
+            This app uses machine learning to identify music genres from audio samples.
+            
+            **Supported Genres:**
+            - Blues
+            - Classical
+            - Country
+            - Disco
+            - Hip Hop
+            - Jazz
+            - Metal
+            - Pop
+            - Reggae
+            - Rock
+            
+            The model was trained on the GTZAN dataset on the following models:
+            - SVM
+            - Random Forest Classifier
+            - XGBoost 
+            - Perceptron
+            """
+        )
+    
+    with col2:
+        st.markdown("## Help")
+        st.info(
+            """
+            **Tips for best results:**
+            - Use clear audio samples without background noise
+            - Ensure the sample contains distinguishable musical elements
+            - Longer samples (10+ seconds) provide better results
+            - Try different segments of a song for more accurate classification
+            
+            **Settings:**
+            - Sample Duration: 5-30 seconds
+            - Recommended: 10-15 seconds
+            """
+        )
     
     # Add a cool horizontal line
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -637,19 +676,11 @@ def display_results(results):
     confidence = results["confidence"]
     characteristics = get_genre_characteristics(genre)
 
-    # Toggle Theme Button
-    if st.button('🌓 Toggle Theme', key = 'toggle_theme_button_1'):
-        st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
-        st.experimental_rerun()
-
     st.markdown(f"""
-    <div class="genre-prediction" style="background-color: {characteristics['color']};">
-        {genre.upper()} ({confidence:.1f}%)
+    <div style="background-color: {characteristics['color']}; color: white; text-align: center; padding: 10px; border-radius: 10px;">
+        <h2>{genre.upper()} ({confidence:.1f}%)</h2>
     </div>
     """, unsafe_allow_html=True)
-
-    # Confidence Threshold Slider
-    confidence_threshold = st.slider("Confidence Threshold (%)", 0, 100, 20)
 
     col1, col2 = st.columns([2, 1])
 
@@ -663,40 +694,6 @@ def display_results(results):
             st.image(results["visualizations"]["chromagram"])
 
     with col2:
-        # About Section
-        with st.expander("About"):
-            st.info(
-                """
-                This app uses machine learning to identify music genres from audio samples.
-                
-                **Supported Genres:**
-                - Blues
-                - Classical
-                - Country
-                - Disco
-                - Hip Hop
-                - Jazz
-                - Metal
-                - Pop
-                - Reggae
-                - Rock
-                
-                The model was trained on the GTZAN dataset using ensemble learning techniques.
-                """
-            )
-
-        # Help Section
-        with st.expander("Help"):
-            st.markdown(
-                """
-                **Tips for best results:**
-                - Use clear audio samples without background noise
-                - Ensure the sample contains distinguishable musical elements
-                - Longer samples (10+ seconds) provide better results
-                - Try different segments of a song for more accurate classification
-                """
-            )
-
         st.markdown(f"### {genre.title()} Characteristics")
         st.markdown(f"**Description**: {characteristics['description']}")
         st.markdown(f"**Instruments**: {characteristics['instruments']}")
@@ -707,18 +704,23 @@ def display_results(results):
         st.markdown(f"**Sample Rate**: {results['sample_rate']} Hz")
 
     st.markdown("### Confidence Levels")
-    # Pie chart instead of bar graph
+    # Pie chart modifications
     fig = go.Figure(data=[go.Pie(
         labels=results["top_genres"], 
         values=results["top_probs"], 
-        hole=.3,
+        hole=.5,  # Increased inner radius
         textinfo='label+percent',
-        hoverinfo='label+value'
+        hoverinfo='label+value',
+        marker=dict(colors=px.colors.qualitative.Pastel)  # Softer colors
     )])
-    fig.update_layout(title="Top Genre Predictions")
+    fig.update_layout(
+        title="Top Genre Predictions", 
+        plot_bgcolor='white',  # White background
+        width=600  # Half screen width
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Spotify Recommendations with improved formatting
+    # Spotify Recommendations (Keep unchanged)
     st.markdown("### Spotify Recommendations")
     spotify_api = SpotifyAPI(st.secrets["spotify"]["client_id"], 
                          st.secrets["spotify"]["client_secret"])
@@ -738,12 +740,14 @@ def display_results(results):
         st.warning("No recommendations found for this genre.")
 
 def main():
-    # Theme toggle in sidebar
+    # Apply custom CSS
+    st.markdown(get_custom_css(), unsafe_allow_html=True)
+    
+    # Theme toggle button
     theme_toggle()
     
-    # Configure page
+    # Header section with About and Help
     header_section()
-    sidebar_section()
     
     # Load models
     models = load_models()
@@ -770,5 +774,6 @@ def main():
         """,
         unsafe_allow_html=True
     )
+
 if __name__ == "__main__":
     main()
