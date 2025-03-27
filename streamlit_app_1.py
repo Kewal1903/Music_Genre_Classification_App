@@ -112,19 +112,19 @@ st.set_page_config(
     page_title="Music Genre Classifier",
     page_icon="🎵",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # Custom CSS for better UI with light and dark mode
 def get_custom_css(theme='light'):
     if theme == 'light':
-        bg_primary = '#fbda61'
-        bg_secondary = '#ff5acd'
+        bg_primary = 'indigo'
+        bg_secondary = 'aqua'
         text_primary = 'white'
         text_secondary = 'white'
-        accent_color = 'grey'
+        accent_color = 'purple'
         accent_hover = 'grey'
-        card_shadow = 'grey'
+        card_shadow = 'rgba(0, 0, 0, 0.1)'
     else:  # dark mode
         bg_primary = 'black'
         bg_secondary = 'olive'
@@ -222,51 +222,22 @@ def get_custom_css(theme='light'):
         .stButton > button:hover {{
             background-color: {accent_hover};
         }}
-        .theme-toggle {{
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-        }}
-
-        /* Main Header */
-        .main-header {{
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #3F51B5;
-            text-align: center;
-            margin-bottom: 1rem;
-        }}
-
-        /* Visualization Elements */
-        .stImage img {{
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }}
-
-        /* Pie Chart Customization */
-        .pie-chart {{
-            width: 50% !important;
-        }}
     </style>
     """
 
-
 # Theme toggle function
-def toggle_theme():
-    # Toggle theme function
+def theme_toggle():
+    # Check if theme is already in session state
     if 'theme' not in st.session_state:
         st.session_state.theme = 'light'
     
-    # Theme toggle as fixed position button
-    st.markdown(
-        """
-        <div class="theme-toggle">
-            <button onclick="window.location.reload()">🌓 Toggle Theme</button>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    # Toggle button
+    if st.sidebar.button('🌓 Toggle Theme'):
+        st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
+    
+    # Apply CSS based on current theme
+    st.markdown(get_custom_css(st.session_state.theme), unsafe_allow_html=True)
+
 def extract_features(y, sr):
     # Basic features
     mfccs = np.mean(librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T, axis=0)
@@ -305,17 +276,14 @@ def generate_visualizations(y, sr):
     # Create visualizations
     visualizations = {}
     
-    # Waveform with grid and different color
-    plt.figure(figsize=(10, 4), facecolor='white')
-    plt.plot(np.linspace(0, len(y)/sr, len(y)), y, color='#3F51B5')  # Changed color
-    plt.title('Waveform', fontsize=12)
-    plt.xlabel('Time (seconds)', fontsize=10)
-    plt.ylabel('Amplitude', fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)  # Added grid
+    # Waveform
+    plt.figure(figsize=(10, 4))
+    librosa.display.waveshow(y, sr=sr)
+    plt.title('Waveform')
     plt.tight_layout()
     
     waveform = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(waveform.name, facecolor='white', edgecolor='none')
+    plt.savefig(waveform.name)
     plt.close()
     visualizations['waveform'] = waveform.name
     
@@ -463,11 +431,22 @@ def get_genre_characteristics(genre):
 # Define app sections
 def header_section():
     st.markdown('<div class="main-header">🎵 Music Genre Classification</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="info-text">
+        Upload an audio file or record a sample to identify its musical genre. 
+        The app analyzes audio characteristics to determine the most likely genre.
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
     
-    # Layout for About and Help sections
-    col1, col2 = st.columns(2)
-    
-    with col1:
+    # Add a cool horizontal line
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+def sidebar_section():
+    with st.sidebar:
+        st.image("https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80", use_container_width=True)
         st.markdown("## About")
         st.info(
             """
@@ -485,39 +464,27 @@ def header_section():
             - Reggae
             - Rock
             
-            The model was trained on the GTZAN dataset on the following models:
-            - SVM
-            - Random Forest Classifier
-            - XGBoost 
-            - Perceptron
+            The model was trained on the GTZAN dataset on the following models :- SVM, Random Forest Classifier, XGBoost and Perceptron.
             """
         )
-    
-    with col2:
+        
+        st.markdown("## Settings")
+        sample_duration = st.slider("Sample Duration (seconds)", 5, 30, 10)
+        confidence_threshold = st.slider("Confidence Threshold (%)", 0, 100, 20)
+        
         st.markdown("## Help")
-        st.info(
-            """
-            **Tips for best results:**
-            - Use clear audio samples without background noise
-            - Ensure the sample contains distinguishable musical elements
-            - Longer samples (10+ seconds) provide better results
-            - Try different segments of a song for more accurate classification
-            
-            **Settings:**
-            - Sample Duration: 5-30 seconds
-            - Recommended: 10-15 seconds
-            """
-        )
-    
-    # Add a cool horizontal line
-    st.markdown("<hr>", unsafe_allow_html=True)
+        with st.expander("Tips for best results"):
+            st.markdown(
+                """
+                - Use clear audio samples without background noise
+                - Ensure the sample contains distinguishable musical elements
+                - Longer samples (10+ seconds) provide better results
+                - Try different segments of a song for more accurate classification
+                """
+            )
 
-    
 def prediction_section(models):
     st.markdown('<div class="sub-header">Upload or Record Audio</div>', unsafe_allow_html=True)
-    
-    # Confidence Threshold Slider (moved to top)
-    confidence_threshold = st.slider("Confidence Threshold (%)", 0, 100, 20)
     
     # Create tabs for different input methods
     tabs = st.tabs(["Upload File", "Record Microphone", "Sample Library"])
@@ -583,23 +550,16 @@ def prediction_section(models):
             try:
                 samples = [f for f in os.listdir(sample_dir) if f.endswith(('.wav', '.mp3', '.ogg'))]
                 if samples:
-                    # Add "None" as the first option
-                    samples.insert(0, "None")
                     selected_sample = st.selectbox("Select a sample", samples)
-                    
-                    if selected_sample != "None":
-                        sample_path = os.path.join(sample_dir, selected_sample)
-                        st.audio(sample_path)
-                        st.session_state.audio_file_path = sample_path
-                    else:
-                        st.session_state.audio_file_path = None
+                    sample_path = os.path.join(sample_dir, selected_sample)
+                    st.audio(sample_path)
+                    st.session_state.audio_file_path = sample_path
                 else:
                     st.warning("No audio samples found in the sample directory. Please add some audio files to the 'sample_audio' folder.")
             except Exception as e:
                 st.error(f"Error accessing sample directory: {e}")
     
     return st.session_state.audio_file_path
-
 
 def analyze_audio(file_path, models):
     if not file_path:
@@ -677,8 +637,8 @@ def display_results(results):
     characteristics = get_genre_characteristics(genre)
 
     st.markdown(f"""
-    <div style="background-color: {characteristics['color']}; color: white; text-align: center; padding: 10px; border-radius: 10px;">
-        <h2>{genre.upper()} ({confidence:.1f}%)</h2>
+    <div class="genre-prediction" style="background-color: {characteristics['color']};">
+        {genre.upper()} ({confidence:.1f}%)
     </div>
     """, unsafe_allow_html=True)
 
@@ -704,51 +664,40 @@ def display_results(results):
         st.markdown(f"**Sample Rate**: {results['sample_rate']} Hz")
 
     st.markdown("### Confidence Levels")
-    # Pie chart modifications
-    fig = go.Figure(data=[go.Pie(
-        labels=results["top_genres"], 
-        values=results["top_probs"], 
-        hole=.5,  # Increased inner radius
-        textinfo='label+percent',
-        hoverinfo='label+value',
-        marker=dict(colors=px.colors.qualitative.Pastel)  # Softer colors
-    )])
-    fig.update_layout(
-        title="Top Genre Predictions", 
-        plot_bgcolor='blue',  # White background
-        width=600  # Half screen width
+    fig = px.bar(
+        x=results["top_probs"], y=results["top_genres"], orientation='h',
+        labels={"x": "Confidence (%)", "y": "Genre"},
+        text=[f"{p:.1f}%" for p in results["top_probs"]],
+        color=results["top_probs"],
+        color_continuous_scale=["blue", "green", "#1DB954"],
+        title="Top Genre Predictions"
     )
-    st.plotly_chart(fig, use_container_width=False)
+    fig.update_layout(xaxis_range=[0, 100], showlegend=False, height=300)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Spotify Recommendations (Keep unchanged)
     st.markdown("### Spotify Recommendations")
     spotify_api = SpotifyAPI(st.secrets["spotify"]["client_id"], 
                          st.secrets["spotify"]["client_secret"])
     recommended_tracks = spotify_api.search_by_genre(genre)
 
     if recommended_tracks:
-        recommendation_cols = st.columns(len(recommended_tracks))
-        for i, track in enumerate(recommended_tracks):
-            with recommendation_cols[i]:
-                st.markdown(f"#### [{track['name']}]({track['external_url']})")
-                st.markdown(f"*{track['artist']}*")
+        for track in recommended_tracks:
+            with st.container():
+                st.markdown(f"**[{track['name']}]({track['external_url']})** - {track['artist']}")
                 if track["image_url"]:
-                    st.image(track["image_url"], use_container_width=True)
+                    st.image(track["image_url"], width=100)
                 if track["preview_url"]:
                     st.audio(track["preview_url"], format="audio/mp3")
     else:
         st.warning("No recommendations found for this genre.")
 
-
 def main():
-    # Apply custom CSS
-    st.markdown(get_custom_css(), unsafe_allow_html=True)
+    # Theme toggle in sidebar
+    theme_toggle()
     
-    # Theme toggle button
-    toggle_theme()
-    
-    # Header section with About and Help
+    # Configure page
     header_section()
+    sidebar_section()
     
     # Load models
     models = load_models()
@@ -775,6 +724,5 @@ def main():
         """,
         unsafe_allow_html=True
     )
-
 if __name__ == "__main__":
     main()
